@@ -1,5 +1,7 @@
 import customtkinter as ctk
 import threading
+import json
+import os
 from autobot import AutoBot
 from recorder import Recorder
 from pynput import keyboard
@@ -7,7 +9,7 @@ from pynput import keyboard
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Auto Clicker & Key Presser")
+        self.title("Auto Clicker & Key Presser (made by SDJ9)")
         self.geometry("500x550")
         
         self.autobot = AutoBot()
@@ -30,6 +32,8 @@ class App(ctk.CTk):
         self.setup_recorder_tab()
         self.setup_settings_tab()
         
+        self.load_config()
+        
         self.status_label = ctk.CTkLabel(self, text="Status: Idle", text_color="green", font=("Arial", 14, "bold"))
         self.status_label.pack(pady=10)
         
@@ -40,6 +44,7 @@ class App(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def on_closing(self):
+        self.save_config()
         self.autobot.stop()
         self.recorder.stop_playback()
         self.recorder.stop_recording()
@@ -281,6 +286,77 @@ class App(ctk.CTk):
                 self.record_btn.configure(text=f"Stop Recording (or {rhk_upper})")
             else:
                 self.record_btn.configure(text=f"Start Recording (or {rhk_upper})")
+
+    def save_config(self):
+        config = {
+            "btn_var": self.btn_var.get(),
+            "click_h": self.click_h.get(),
+            "click_m": self.click_m.get(),
+            "click_s": self.click_s.get(),
+            "click_ms": self.click_ms.get(),
+            "click_repeat": self.click_repeat.get(),
+            
+            "key_entry": self.key_entry.get(),
+            "key_h": self.key_h.get(),
+            "key_m": self.key_m.get(),
+            "key_s": self.key_s.get(),
+            "key_ms": self.key_ms.get(),
+            "key_repeat": self.key_repeat.get(),
+            
+            "playback_repeat": self.playback_repeat.get(),
+            
+            "hotkey_str": self.hotkey_str,
+            "record_hotkey_str": self.record_hotkey_str
+        }
+        try:
+            with open("config.json", "w") as f:
+                json.dump(config, f)
+        except Exception as e:
+            print("Error saving config:", e)
+
+    def load_config(self):
+        if not os.path.exists("config.json"):
+            return
+        try:
+            with open("config.json", "r") as f:
+                config = json.load(f)
+                
+            if "btn_var" in config: self.btn_var.set(config["btn_var"])
+            
+            self._set_entry(self.click_h, config.get("click_h", "0"))
+            self._set_entry(self.click_m, config.get("click_m", "0"))
+            self._set_entry(self.click_s, config.get("click_s", "0"))
+            self._set_entry(self.click_ms, config.get("click_ms", "100"))
+            self._set_entry(self.click_repeat, config.get("click_repeat", "0"))
+            
+            self._set_entry(self.key_entry, config.get("key_entry", "a"))
+            self._set_entry(self.key_h, config.get("key_h", "0"))
+            self._set_entry(self.key_m, config.get("key_m", "0"))
+            self._set_entry(self.key_s, config.get("key_s", "0"))
+            self._set_entry(self.key_ms, config.get("key_ms", "100"))
+            self._set_entry(self.key_repeat, config.get("key_repeat", "0"))
+            
+            self._set_entry(self.playback_repeat, config.get("playback_repeat", "1"))
+            
+            if "hotkey_str" in config: self.hotkey_str = config["hotkey_str"]
+            if "record_hotkey_str" in config: self.record_hotkey_str = config["record_hotkey_str"]
+            
+            self._set_entry(self.hotkey_entry, self.hotkey_str)
+            self._set_entry(self.record_hotkey_entry, self.record_hotkey_str)
+            
+            hk_upper = self.hotkey_str.upper()
+            rhk_upper = self.record_hotkey_str.upper()
+            self.btn_clicker_start.configure(text=f"Start (or {hk_upper})")
+            self.btn_presser_start.configure(text=f"Start (or {hk_upper})")
+            self.play_btn.configure(text=f"Play (or {hk_upper})")
+            self.record_btn.configure(text=f"Start Recording (or {rhk_upper})")
+            
+        except Exception as e:
+            print("Error loading config:", e)
+            
+    def _set_entry(self, entry, value):
+        entry.delete(0, 'end')
+        entry.insert(0, str(value))
 
 if __name__ == "__main__":
     ctk.set_appearance_mode("Dark")
