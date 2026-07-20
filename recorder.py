@@ -68,7 +68,7 @@ class Recorder:
         if not self.events or self.is_playing:
             return
         self.is_playing = True
-        self.play_thread = threading.Thread(target=self._play_loop, args=(repeat_count,))
+        self.play_thread = threading.Thread(target=self._play_loop, args=(repeat_count,), daemon=True)
         self.play_thread.start()
         
     def _play_loop(self, repeat_count):

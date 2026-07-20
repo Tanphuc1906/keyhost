@@ -14,7 +14,7 @@ class AutoBot:
         if self.running:
             return
         self.running = True
-        self.thread = threading.Thread(target=self._click_loop, args=(button_name, interval_ms, repeat_count))
+        self.thread = threading.Thread(target=self._click_loop, args=(button_name, interval_ms, repeat_count), daemon=True)
         self.thread.start()
 
     def _click_loop(self, button_name, interval_ms, repeat_count):
@@ -38,7 +38,7 @@ class AutoBot:
         if self.running:
             return
         self.running = True
-        self.thread = threading.Thread(target=self._key_loop, args=(key_str, interval_ms, repeat_count))
+        self.thread = threading.Thread(target=self._key_loop, args=(key_str, interval_ms, repeat_count), daemon=True)
         self.thread.start()
 
     def _key_loop(self, key_str, interval_ms, repeat_count):

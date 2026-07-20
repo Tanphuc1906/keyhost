@@ -36,6 +36,16 @@ class App(ctk.CTk):
         # Start Global Listener
         self.listener = keyboard.Listener(on_press=self.on_press)
         self.listener.start()
+        
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def on_closing(self):
+        self.autobot.stop()
+        self.recorder.stop_playback()
+        self.recorder.stop_recording()
+        if self.listener:
+            self.listener.stop()
+        self.destroy()
 
     def update_status(self, text, color="green"):
         self.status_label.configure(text=text, text_color=color)
