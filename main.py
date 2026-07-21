@@ -6,7 +6,35 @@ from autobot import AutoBot
 from recorder import Recorder
 from pynput import keyboard
 
+
+class OverlayNotification(ctk.CTkToplevel):
+    def __init__(self, master):
+        super().__init__(master)
+        self.overrideredirect(True)
+        self.attributes("-topmost", True)
+        self.attributes("-alpha", 0.85)
+        self.label = ctk.CTkLabel(self, text="", font=("Arial", 14, "bold"), text_color="white", corner_radius=10, fg_color="#333333", padx=15, pady=15)
+        self.label.pack()
+        self.withdraw()
+
+    def show_msg(self, title, stop_hk, exit_hk):
+        msg = f"▶ {title} ĐANG CHẠY\nNhấn [{stop_hk}] để dừng\nNhấn [{exit_hk}] để tắt ứng dụng"
+        self.label.configure(text=msg)
+        self.update_idletasks()
+        width = self.winfo_reqwidth()
+        height = self.winfo_reqheight()
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = screen_width - width - 20
+        y = screen_height - height - 60
+        self.geometry(f"{width}x{height}+{x}+{y}")
+        self.deiconify()
+
+    def hide_msg(self):
+        self.withdraw()
+
 class App(ctk.CTk):
+
     def __init__(self):
         super().__init__()
         self.title("Auto Clicker & Key Presser (made by SDJ9)")
@@ -17,6 +45,8 @@ class App(ctk.CTk):
         
         self.hotkey_str = "f8"
         self.record_hotkey_str = "f9"
+        self.exit_hotkey_str = "f10"
+        self.overlay = OverlayNotification(self)
         
         # UI Setup
         self.tabview = ctk.CTkTabview(self)
@@ -62,10 +92,11 @@ class App(ctk.CTk):
             key_name = key.name
             
         if key_name and key_name.lower() == self.hotkey_str.lower():
-            # Run in main thread to avoid GUI thread issues
             self.after(0, self.toggle_action)
         elif key_name and key_name.lower() == self.record_hotkey_str.lower():
             self.after(0, self.toggle_recording)
+        elif key_name and key_name.lower() == self.exit_hotkey_str.lower():
+            self.after(0, self.on_closing)
 
     def toggle_action(self):
         current_tab = self.tabview.get()
@@ -73,11 +104,13 @@ class App(ctk.CTk):
         if self.autobot.running:
             self.autobot.stop()
             self.update_status("Status: Stopped", "red")
+            self.overlay.hide_msg()
             return
             
         if self.recorder.is_playing:
             self.recorder.stop_playback()
             self.update_status("Status: Playback Stopped", "red")
+            self.overlay.hide_msg()
             return
             
         if self.recorder.is_recording:
@@ -142,6 +175,7 @@ class App(ctk.CTk):
             btn = self.btn_var.get()
             self.autobot.start_clicker(btn, interval, repeat)
             self.update_status(f"Status: Auto Clicking ({btn})", "orange")
+            self.overlay.show_msg("Auto Clicker", self.hotkey_str.upper(), self.exit_hotkey_str.upper())
         except ValueError:
             self.update_status("Error: Invalid interval/repeat", "red")
 
@@ -199,6 +233,7 @@ class App(ctk.CTk):
                 return
             self.autobot.start_key_presser(key_val, interval, repeat)
             self.update_status(f"Status: Auto Pressing ({key_val})", "orange")
+            self.overlay.show_msg("Key Presser", self.hotkey_str.upper(), self.exit_hotkey_str.upper())
         except ValueError:
             self.update_status("Error: Invalid interval/repeat", "red")
 
@@ -219,6 +254,7 @@ class App(ctk.CTk):
         if self.recorder.is_recording:
             self.recorder.stop_recording()
             self.record_btn.configure(text=f"Start Recording (or {self.record_hotkey_str.upper()})", fg_color="red")
+            self.overlay.hide_msg()
             # The stop hotkey was probably recorded, let's remove the last few press/release events that match our hotkey
             self._filter_hotkey_from_recording()
             self.update_status(f"Status: Recording Saved ({len(self.recorder.events)} events)", "green")
@@ -226,6 +262,7 @@ class App(ctk.CTk):
             self.recorder.start_recording()
             self.record_btn.configure(text=f"Stop Recording (or {self.record_hotkey_str.upper()})", fg_color="gray")
             self.update_status(f"Status: Recording... (Press {self.record_hotkey_str.upper()} to Stop)", "red")
+            self.overlay.show_msg("Recording", self.record_hotkey_str.upper(), self.exit_hotkey_str.upper())
 
     def _filter_hotkey_from_recording(self):
         # Remove the hotkey press/release events at the end of the recording
@@ -252,6 +289,7 @@ class App(ctk.CTk):
                 return
             self.recorder.start_playback(repeat)
             self.update_status("Status: Playing back...", "orange")
+            self.overlay.show_msg("Playback", self.hotkey_str.upper(), self.exit_hotkey_str.upper())
         except ValueError:
             self.update_status("Error: Invalid repeat value", "red")
 
@@ -267,14 +305,21 @@ class App(ctk.CTk):
         self.record_hotkey_entry.insert(0, self.record_hotkey_str)
         self.record_hotkey_entry.pack(pady=5)
         
+        ctk.CTkLabel(self.tab_settings, text="Exit App Hotkey (e.g. 'f10'):").pack(pady=5)
+        self.exit_hotkey_entry = ctk.CTkEntry(self.tab_settings)
+        self.exit_hotkey_entry.insert(0, self.exit_hotkey_str)
+        self.exit_hotkey_entry.pack(pady=5)
+        
         ctk.CTkButton(self.tab_settings, text="Save Hotkeys", command=self.save_hotkeys).pack(pady=15)
 
     def save_hotkeys(self):
         new_hotkey = self.hotkey_entry.get().strip().lower()
         new_record_hotkey = self.record_hotkey_entry.get().strip().lower()
-        if new_hotkey and new_record_hotkey:
+        new_exit_hotkey = self.exit_hotkey_entry.get().strip().lower()
+        if new_hotkey and new_record_hotkey and new_exit_hotkey:
             self.hotkey_str = new_hotkey
             self.record_hotkey_str = new_record_hotkey
+            self.exit_hotkey_str = new_exit_hotkey
             self.update_status(f"Status: Hotkeys updated", "green")
             hk_upper = self.hotkey_str.upper()
             rhk_upper = self.record_hotkey_str.upper()
@@ -306,7 +351,8 @@ class App(ctk.CTk):
             "playback_repeat": self.playback_repeat.get(),
             
             "hotkey_str": self.hotkey_str,
-            "record_hotkey_str": self.record_hotkey_str
+            "record_hotkey_str": self.record_hotkey_str,
+            "exit_hotkey_str": self.exit_hotkey_str
         }
         try:
             with open("config.json", "w") as f:
@@ -340,9 +386,11 @@ class App(ctk.CTk):
             
             if "hotkey_str" in config: self.hotkey_str = config["hotkey_str"]
             if "record_hotkey_str" in config: self.record_hotkey_str = config["record_hotkey_str"]
+            if "exit_hotkey_str" in config: self.exit_hotkey_str = config["exit_hotkey_str"]
             
             self._set_entry(self.hotkey_entry, self.hotkey_str)
             self._set_entry(self.record_hotkey_entry, self.record_hotkey_str)
+            self._set_entry(self.exit_hotkey_entry, self.exit_hotkey_str)
             
             hk_upper = self.hotkey_str.upper()
             rhk_upper = self.record_hotkey_str.upper()
