@@ -79,17 +79,25 @@ class App(ctk.CTk):
         self.header_frame = ctk.CTkFrame(self, fg_color=BG_COLOR)
         self.header_frame.pack(fill="x", pady=(15, 0))
         
+        inner_frame = ctk.CTkFrame(self.header_frame, fg_color="transparent")
+        inner_frame.pack(anchor="center")
+        
         try:
             img_path = resource_path("logo.png")
-            logo_img = ctk.CTkImage(light_image=Image.open(img_path), dark_image=Image.open(img_path), size=(250, 45))
-            self.logo_label = ctk.CTkLabel(self.header_frame, image=logo_img, text="")
-            self.logo_label.pack(pady=(0,5))
+            logo_img = ctk.CTkImage(light_image=Image.open(img_path), dark_image=Image.open(img_path), size=(50, 50))
+            self.logo_label = ctk.CTkLabel(inner_frame, image=logo_img, text="")
+            self.logo_label.pack(side="left", padx=(0, 10))
         except Exception:
-            self.title_lbl = ctk.CTkLabel(self.header_frame, text="AUTOMATE STUDIO", font=FONT_BIG, text_color=ACCENT_CYAN)
-            self.title_lbl.pack()
+            pass
             
-        self.subtitle_lbl = ctk.CTkLabel(self.header_frame, text="Automate your reality. Made by SDJ9.", font=FONT_MAIN, text_color=ACCENT_PURPLE)
-        self.subtitle_lbl.pack()
+        text_frame = ctk.CTkFrame(inner_frame, fg_color="transparent")
+        text_frame.pack(side="left")
+        
+        self.title_lbl = ctk.CTkLabel(text_frame, text="AUTOMATE STUDIO (オートメーションスタジオ)", font=FONT_BIG, text_color=ACCENT_CYAN)
+        self.title_lbl.pack(anchor="w")
+        
+        self.subtitle_lbl = ctk.CTkLabel(text_frame, text="made by SDJ9", font=FONT_MAIN, text_color=ACCENT_PURPLE)
+        self.subtitle_lbl.pack(anchor="w")
 
         # Custom TabView Styling
         self.tabview = ctk.CTkTabview(
