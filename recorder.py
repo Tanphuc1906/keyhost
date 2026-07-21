@@ -1,8 +1,24 @@
 import time
 import threading
+import json
 from pynput import mouse, keyboard
 from pynput.mouse import Controller as MouseController
 from pynput.keyboard import Controller as KeyboardController
+
+def _serialize_key(key):
+    if isinstance(key, keyboard.Key):
+        return {"type": "Key", "name": key.name}
+    elif isinstance(key, keyboard.KeyCode):
+        return {"type": "KeyCode", "char": key.char, "vk": key.vk}
+    else:
+        return {"type": "unknown", "repr": str(key)}
+
+def _deserialize_key(data):
+    if data.get("type") == "Key":
+        return getattr(keyboard.Key, data["name"], None)
+    elif data.get("type") == "KeyCode":
+        return keyboard.KeyCode(vk=data.get("vk"), char=data.get("char"))
+    return None
 
 class Recorder:
     def __init__(self):
@@ -113,3 +129,28 @@ class Recorder:
 
     def stop_playback(self):
         self.is_playing = False
+
+    def save_to_file(self, filename):
+        data = []
+        for event_time, event_type, args in self.events:
+            if event_type in ('press', 'release'):
+                s_args = [_serialize_key(args[0])]
+            else:
+                s_args = list(args)
+            data.append({"time": event_time, "type": event_type, "args": s_args})
+        with open(filename, 'w') as f:
+            json.dump(data, f)
+
+    def load_from_file(self, filename):
+        with open(filename, 'r') as f:
+            data = json.load(f)
+        self.events = []
+        for item in data:
+            event_time = item["time"]
+            event_type = item["type"]
+            args = item["args"]
+            if event_type in ('press', 'release'):
+                d_key = _deserialize_key(args[0])
+                self.events.append((event_time, event_type, (d_key,)))
+            else:
+                self.events.append((event_time, event_type, tuple(args)))

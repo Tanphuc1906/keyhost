@@ -2,6 +2,9 @@ import customtkinter as ctk
 import threading
 import json
 import os
+import sys
+from tkinter import filedialog
+from PIL import Image
 from autobot import AutoBot
 from recorder import Recorder
 from pynput import keyboard
@@ -17,6 +20,13 @@ FONT_MAIN = ("Segoe UI", 12)
 FONT_BOLD = ("Segoe UI", 13, "bold")
 FONT_TITLE = ("Segoe UI", 16, "bold")
 FONT_BIG = ("Segoe UI", 20, "bold")
+
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 class OverlayNotification(ctk.CTkToplevel):
     def __init__(self, master):
@@ -69,8 +79,15 @@ class App(ctk.CTk):
         self.header_frame = ctk.CTkFrame(self, fg_color=BG_COLOR)
         self.header_frame.pack(fill="x", pady=(15, 0))
         
-        self.title_lbl = ctk.CTkLabel(self.header_frame, text="NEO AUTO CLICKER", font=FONT_BIG, text_color=ACCENT_CYAN)
-        self.title_lbl.pack()
+        try:
+            img_path = resource_path("logo.png")
+            logo_img = ctk.CTkImage(light_image=Image.open(img_path), dark_image=Image.open(img_path), size=(250, 45))
+            self.logo_label = ctk.CTkLabel(self.header_frame, image=logo_img, text="")
+            self.logo_label.pack(pady=(0,5))
+        except Exception:
+            self.title_lbl = ctk.CTkLabel(self.header_frame, text="AUTOMATE STUDIO", font=FONT_BIG, text_color=ACCENT_CYAN)
+            self.title_lbl.pack()
+            
         self.subtitle_lbl = ctk.CTkLabel(self.header_frame, text="Automate your reality. Made by SDJ9.", font=FONT_MAIN, text_color=ACCENT_PURPLE)
         self.subtitle_lbl.pack()
 
@@ -293,6 +310,11 @@ class App(ctk.CTk):
         )
         self.record_btn.pack(pady=(5, 15), padx=20, fill="x")
         
+        io_row = ctk.CTkFrame(card1, fg_color="transparent")
+        io_row.pack(fill="x", padx=20, pady=(0, 15))
+        ctk.CTkButton(io_row, text="SAVE RECORDING", command=self.save_recording, fg_color=FRAME_COLOR, border_width=1, border_color=ACCENT_CYAN, text_color=ACCENT_CYAN, hover_color=ACCENT_PURPLE).pack(side="left", expand=True, padx=(0,5))
+        ctk.CTkButton(io_row, text="LOAD RECORDING", command=self.load_recording, fg_color=FRAME_COLOR, border_width=1, border_color=ACCENT_PINK, text_color=ACCENT_PINK, hover_color=ACCENT_PURPLE).pack(side="right", expand=True, padx=(5,0))
+
         card2 = self.create_card(self.tab_recorder, "PLAYBACK MODULE")
         
         rep_row = ctk.CTkFrame(card2, fg_color="transparent")
@@ -308,6 +330,27 @@ class App(ctk.CTk):
             hover_color=ACCENT_PURPLE, text_color=BG_COLOR, height=45
         )
         self.play_btn.pack(pady=(5, 15), padx=20, fill="x")
+
+    def save_recording(self):
+        if not self.recorder.events:
+            self.update_status("ERROR: NO DATA TO SAVE", ACCENT_PINK)
+            return
+        filepath = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON Files", "*.json")])
+        if filepath:
+            try:
+                self.recorder.save_to_file(filepath)
+                self.update_status("RECORDING SAVED", ACCENT_CYAN)
+            except Exception as e:
+                self.update_status("ERROR SAVING", ACCENT_PINK)
+
+    def load_recording(self):
+        filepath = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
+        if filepath:
+            try:
+                self.recorder.load_from_file(filepath)
+                self.update_status(f"LOADED {len(self.recorder.events)} EVENTS", ACCENT_CYAN)
+            except Exception as e:
+                self.update_status("ERROR LOADING", ACCENT_PINK)
 
     def toggle_recording(self):
         if self.recorder.is_recording:
