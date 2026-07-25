@@ -343,7 +343,7 @@ class App(ctk.CTk):
         if not self.recorder.events:
             self.update_status("ERROR: NO DATA TO SAVE", ACCENT_PINK)
             return
-        filepath = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON Files", "*.json")])
+        filepath = filedialog.asksaveasfilename(defaultextension=".rec", filetypes=[("TinyTask / Rec Files", "*.rec"), ("JSON Files", "*.json"), ("All Files", "*.*")])
         if filepath:
             try:
                 self.recorder.save_to_file(filepath)
@@ -352,7 +352,7 @@ class App(ctk.CTk):
                 self.update_status("ERROR SAVING", ACCENT_PINK)
 
     def load_recording(self):
-        filepath = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
+        filepath = filedialog.askopenfilename(filetypes=[("Supported Recordings", "*.rec;*.json"), ("TinyTask Rec Files", "*.rec"), ("JSON Files", "*.json"), ("All Files", "*.*")])
         if filepath:
             try:
                 self.recorder.load_from_file(filepath)

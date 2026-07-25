@@ -1,6 +1,7 @@
 import time
 import threading
 import json
+import struct
 from pynput import mouse, keyboard
 from pynput.mouse import Controller as MouseController
 from pynput.keyboard import Controller as KeyboardController
@@ -131,6 +132,12 @@ class Recorder:
         self.is_playing = False
 
     def save_to_file(self, filename):
+        if filename.lower().endswith('.rec'):
+            self._save_to_rec(filename)
+        else:
+            self._save_to_json(filename)
+
+    def _save_to_json(self, filename):
         data = []
         for event_time, event_type, args in self.events:
             if event_type in ('press', 'release'):
@@ -141,7 +148,50 @@ class Recorder:
         with open(filename, 'w') as f:
             json.dump(data, f)
 
+    def _save_to_rec(self, filename):
+        with open(filename, 'wb') as f:
+            idx = 1
+            for event_time, event_type, args in self.events:
+                timestampms = int(event_time * 1000) & 0xFFFFFFFF
+                act = 0
+                a = 0
+                b = 0
+                if event_type == 'move':
+                    act = 0x0200
+                    a = int(args[0]) & 0xFFFF
+                    b = int(args[1]) & 0xFFFF
+                elif event_type == 'click':
+                    x, y, btn_name, pressed = args
+                    a = int(x) & 0xFFFF
+                    b = int(y) & 0xFFFF
+                    if btn_name == 'left':
+                        act = 0x0201 if pressed else 0x0202
+                    elif btn_name == 'right':
+                        act = 0x0204 if pressed else 0x0205
+                    elif btn_name == 'middle':
+                        act = 0x0207 if pressed else 0x0208
+                elif event_type == 'press' or event_type == 'release':
+                    act = 0x0100 if event_type == 'press' else 0x0101
+                    key = args[0]
+                    vk = getattr(key, 'vk', None)
+                    if vk is None and hasattr(key, 'value') and hasattr(key.value, 'vk'):
+                        vk = key.value.vk
+                    if vk is None:
+                        vk = 0
+                    a = int(vk) & 0xFFFF
+                    b = 0
+                if act != 0:
+                    record_bytes = struct.pack('<HHHHHHII', act, 0, a, 0, b, 0, timestampms, idx)
+                    f.write(record_bytes)
+                    idx += 1
+
     def load_from_file(self, filename):
+        if filename.lower().endswith('.rec'):
+            self._load_from_rec(filename)
+        else:
+            self._load_from_json(filename)
+
+    def _load_from_json(self, filename):
         with open(filename, 'r') as f:
             data = json.load(f)
         self.events = []
@@ -154,3 +204,35 @@ class Recorder:
                 self.events.append((event_time, event_type, (d_key,)))
             else:
                 self.events.append((event_time, event_type, tuple(args)))
+
+    def _load_from_rec(self, filename):
+        self.events = []
+        record_format = '<HHHHHHII'
+        record_size = struct.calcsize(record_format)
+        first_time = None
+        with open(filename, 'rb') as f:
+            while True:
+                chunk = f.read(record_size)
+                if len(chunk) < record_size:
+                    break
+                act, rsv0, a, rsv1, b, rsv2, timestampms, identifier = struct.unpack(record_format, chunk)
+                if first_time is None:
+                    first_time = timestampms
+                event_time = (timestampms - first_time) / 1000.0
+                if event_time < 0:
+                    event_time = 0.0
+                
+                if act == 0x0200: # move
+                    self.events.append((event_time, 'move', (a, b)))
+                elif act in (0x0201, 0x0202, 0x0204, 0x0205, 0x0207, 0x0208): # clicks
+                    btn_name = 'left'
+                    if act in (0x0204, 0x0205):
+                        btn_name = 'right'
+                    elif act in (0x0207, 0x0208):
+                        btn_name = 'middle'
+                    pressed = act in (0x0201, 0x0204, 0x0207)
+                    self.events.append((event_time, 'click', (a, b, btn_name, pressed)))
+                elif act in (0x0100, 0x0104, 0x0101, 0x0105): # keyboard
+                    event_type = 'press' if act in (0x0100, 0x0104) else 'release'
+                    key = keyboard.KeyCode(vk=a)
+                    self.events.append((event_time, event_type, (key,)))
