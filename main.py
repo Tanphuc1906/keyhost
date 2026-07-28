@@ -145,16 +145,53 @@ class App(ctk.CTk):
     def update_status(self, text, color=ACCENT_CYAN):
         self.status_label.configure(text=text.upper(), text_color=color)
 
+    def _is_entry_focused(self):
+        try:
+            focused = self.focus_get()
+            if not focused:
+                return False
+            w_class = focused.winfo_class()
+            if w_class in ('Entry', 'TEntry', 'Text', 'TText', 'CTkEntry', 'CTkTextbox'):
+                return True
+            known_entries = [
+                getattr(self, 'click_h', None), getattr(self, 'click_m', None), getattr(self, 'click_s', None), getattr(self, 'click_ms', None), getattr(self, 'click_repeat', None),
+                getattr(self, 'key_entry', None), getattr(self, 'key_h', None), getattr(self, 'key_m', None), getattr(self, 'key_s', None), getattr(self, 'key_ms', None), getattr(self, 'key_repeat', None),
+                getattr(self, 'playback_repeat', None), getattr(self, 'hotkey_entry', None), getattr(self, 'record_hotkey_entry', None), getattr(self, 'exit_hotkey_entry', None)
+            ]
+            for e in known_entries:
+                if e and hasattr(e, '_entry') and focused == e._entry:
+                    return True
+                if e and focused == e:
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _get_int_val(self, entry, default=0):
+        try:
+            val = str(entry.get()).strip()
+            if not val:
+                return default
+            return int(val)
+        except Exception:
+            return default
+
     def on_press(self, key):
+        if self._is_entry_focused():
+            return
+
         try:
             key_name = key.char
         except AttributeError:
             key_name = key.name
             
+        current_tab = self.tabview.get()
+
         if key_name and key_name.lower() == self.hotkey_str.lower():
             self.after(0, self.toggle_action)
         elif key_name and key_name.lower() == self.record_hotkey_str.lower():
-            self.after(0, self.toggle_recording)
+            if current_tab == "Record/Playback" or self.recorder.is_recording:
+                self.after(0, self.toggle_recording)
         elif key_name and key_name.lower() == self.exit_hotkey_str.lower():
             self.after(0, self.on_closing)
 
@@ -236,17 +273,17 @@ class App(ctk.CTk):
 
     def start_clicker(self):
         try:
-            h = int(self.click_h.get())
-            m = int(self.click_m.get())
-            s = int(self.click_s.get())
-            ms = int(self.click_ms.get())
+            h = self._get_int_val(self.click_h, 0)
+            m = self._get_int_val(self.click_m, 0)
+            s = self._get_int_val(self.click_s, 0)
+            ms = self._get_int_val(self.click_ms, 100)
             interval = h * 3600000 + m * 60000 + s * 1000 + ms
-            repeat = int(self.click_repeat.get())
+            repeat = self._get_int_val(self.click_repeat, 0)
             btn = self.btn_var.get()
             self.autobot.start_clicker(btn, interval, repeat)
             self.update_status(f"CLICKING >> {btn.upper()}", ACCENT_CYAN)
             self.overlay.show_msg("AUTO CLICKER", self.hotkey_str.upper(), self.exit_hotkey_str.upper())
-        except ValueError:
+        except Exception:
             self.update_status("ERROR: INVALID INPUT", ACCENT_PINK)
 
     # --- Presser Tab ---
@@ -291,12 +328,12 @@ class App(ctk.CTk):
 
     def start_presser(self):
         try:
-            h = int(self.key_h.get())
-            m = int(self.key_m.get())
-            s = int(self.key_s.get())
-            ms = int(self.key_ms.get())
+            h = self._get_int_val(self.key_h, 0)
+            m = self._get_int_val(self.key_m, 0)
+            s = self._get_int_val(self.key_s, 0)
+            ms = self._get_int_val(self.key_ms, 100)
             interval = h * 3600000 + m * 60000 + s * 1000 + ms
-            repeat = int(self.key_repeat.get())
+            repeat = self._get_int_val(self.key_repeat, 0)
             key_val = self.key_entry.get().strip()
             if not key_val:
                 self.update_status("ERROR: KEY CANNOT BE EMPTY", ACCENT_PINK)
@@ -304,7 +341,7 @@ class App(ctk.CTk):
             self.autobot.start_key_presser(key_val, interval, repeat)
             self.update_status(f"PRESSING >> {key_val.upper()}", ACCENT_CYAN)
             self.overlay.show_msg("KEY PRESSER", self.hotkey_str.upper(), self.exit_hotkey_str.upper())
-        except ValueError:
+        except Exception:
             self.update_status("ERROR: INVALID INPUT", ACCENT_PINK)
 
     # --- Recorder Tab ---
@@ -391,14 +428,14 @@ class App(ctk.CTk):
 
     def start_playback(self):
         try:
-            repeat = int(self.playback_repeat.get())
+            repeat = self._get_int_val(self.playback_repeat, 1)
             if not self.recorder.events:
                 self.update_status("ERROR: MEMORY EMPTY", ACCENT_PINK)
                 return
             self.recorder.start_playback(repeat)
             self.update_status("PLAYBACK >> ACTIVE", ACCENT_CYAN)
             self.overlay.show_msg("PLAYBACK", self.hotkey_str.upper(), self.exit_hotkey_str.upper())
-        except ValueError:
+        except Exception:
             self.update_status("ERROR: INVALID REPEAT", ACCENT_PINK)
 
     # --- Settings Tab ---
@@ -446,16 +483,16 @@ class App(ctk.CTk):
     def save_config(self):
         config = {
             "btn_var": self.btn_var.get(),
-            "click_h": self.click_h.get(), "click_m": self.click_m.get(),
-            "click_s": self.click_s.get(), "click_ms": self.click_ms.get(),
-            "click_repeat": self.click_repeat.get(),
+            "click_h": str(self.click_h.get()).strip() or "0", "click_m": str(self.click_m.get()).strip() or "0",
+            "click_s": str(self.click_s.get()).strip() or "0", "click_ms": str(self.click_ms.get()).strip() or "100",
+            "click_repeat": str(self.click_repeat.get()).strip() or "0",
             
-            "key_entry": self.key_entry.get(),
-            "key_h": self.key_h.get(), "key_m": self.key_m.get(),
-            "key_s": self.key_s.get(), "key_ms": self.key_ms.get(),
-            "key_repeat": self.key_repeat.get(),
+            "key_entry": str(self.key_entry.get()).strip() or "a",
+            "key_h": str(self.key_h.get()).strip() or "0", "key_m": str(self.key_m.get()).strip() or "0",
+            "key_s": str(self.key_s.get()).strip() or "0", "key_ms": str(self.key_ms.get()).strip() or "100",
+            "key_repeat": str(self.key_repeat.get()).strip() or "0",
             
-            "playback_repeat": self.playback_repeat.get(),
+            "playback_repeat": str(self.playback_repeat.get()).strip() or "1",
             "hotkey_str": self.hotkey_str,
             "record_hotkey_str": self.record_hotkey_str,
             "exit_hotkey_str": self.exit_hotkey_str
